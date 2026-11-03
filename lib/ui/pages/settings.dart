@@ -6,6 +6,7 @@ import 'package:animestream/ui/pages/settingPages/downloader.dart';
 import 'package:animestream/ui/pages/settingPages/general.dart';
 import 'package:animestream/ui/pages/settingPages/player.dart';
 import 'package:animestream/ui/pages/settingPages/ui.dart';
+import 'package:animestream/ui/pages/subscription/mozzai_subscription_page.dart';
 import 'package:flutter/material.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -32,6 +33,11 @@ class SettingItem {
 class _SettingsPageState extends State<SettingsPage> {
   final List<SettingItem> settingItems = [
     SettingItem(
+        icon: Icons.workspace_premium_rounded,
+        label: "MOZZAI Premium",
+        description: "M-Pesa KSh 60 / 30 Days",
+        navigateTo: const MozzaiSubscriptionPage()),
+    SettingItem(
         icon: Icons.account_circle,
         label: "Account",
         description: "Personal stuff",
@@ -56,11 +62,6 @@ class _SettingsPageState extends State<SettingsPage> {
         label: "General",
         description: "Basic tweaks",
         navigateTo: GeneralSetting()),
-    // SettingItem(
-    //     icon: Icons.storage_rounded,
-    //     label: "Cache Manager",
-    //     description: "Network & API cache",
-    //     navigateTo: CacheSetting()),
     SettingItem(
         icon: Icons.info_outline_rounded,
         label: "App Info",
@@ -80,7 +81,7 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: EdgeInsets.only(top: 40, left: 20, bottom: 40),
+                padding: const EdgeInsets.only(top: 40, left: 20, bottom: 40),
                 child: Text(
                   "Settings",
                   style: TextStyle(
@@ -92,103 +93,99 @@ class _SettingsPageState extends State<SettingsPage> {
               ListView.builder(
                 itemCount: settingItems.length,
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemBuilder: (context, index) => Container(
-                  padding:
-                      EdgeInsets.only(left: 15, right: 15, top: 5, bottom: 5),
-                  child: Container(
-                    // margin: EdgeInsets.only(left: 15, right: 15, top: 5, bottom: 5),
-                    decoration: BoxDecoration(
-                        color: appTheme.backgroundSubColor,
-                        borderRadius: BorderRadius.circular(20)),
-                    clipBehavior: Clip.hardEdge,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context)
-                              .push(
-                            PageRouteBuilder(
-                              pageBuilder: (context, anim, anim2) {
-                                return settingItems[index].navigateTo;
-                              },
-                              transitionDuration: Duration(milliseconds: 100),
-                              reverseTransitionDuration:
-                                  Duration(milliseconds: 100),
-                              transitionsBuilder: (context, animation,
-                                  secondaryAnimation, child) {
-                                // final tween = Tween(begin: Offset(1.0, 0.0), end: Offset.zero);
-                                // final curvedAnimation = CurvedAnimation(
-                                //   parent: animation,
-                                //   curve: Curves.ease,
-                                // );
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                );
-                                // return SlideTransition(
-                                //   position: tween.animate(curvedAnimation),
-                                //   child: child,
-                                // );
-                              },
-                            ),
-                          )
-                              .then((val) {
-                            if (mounted) setState(() {});
-                          });
-                        },
-                        focusColor: appTheme.textSubColor,
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    settingItems[index].icon,
-                                    color: appTheme.textMainColor,
-                                    size: 35,
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 20),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          settingItems[index].label,
-                                          style: TextStyle(
-                                              fontFamily: "NotoSans",
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 20,
-                                              color: appTheme.textMainColor),
-                                        ),
-                                        Text(
-                                          settingItems[index].description,
-                                          style: TextStyle(
-                                            fontFamily: "NunitoSans",
-                                            color: appTheme.textSubColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final isPremiumItem = index == 0;
+                  return Container(
+                    padding: const EdgeInsets.only(left: 15, right: 15, top: 5, bottom: 5),
+                    child: Container(
+                      decoration: BoxDecoration(
+                          color: isPremiumItem
+                              ? appTheme.accentColor.withOpacity(0.18)
+                              : appTheme.backgroundSubColor,
+                          border: isPremiumItem
+                              ? Border.all(color: appTheme.accentColor, width: 1.5)
+                              : null,
+                          borderRadius: BorderRadius.circular(20)),
+                      clipBehavior: Clip.hardEdge,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context)
+                                .push(
+                              PageRouteBuilder(
+                                pageBuilder: (context, anim, anim2) {
+                                  return settingItems[index].navigateTo;
+                                },
+                                transitionDuration: const Duration(milliseconds: 100),
+                                reverseTransitionDuration: const Duration(milliseconds: 100),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
                               ),
-                              Icon(
-                                Icons.keyboard_arrow_right_rounded,
-                                color: appTheme.textMainColor,
-                                size: 30,
-                              )
-                            ],
+                            )
+                                .then((val) {
+                              if (mounted) setState(() {});
+                            });
+                          },
+                          focusColor: appTheme.accentColor.withOpacity(0.3),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      settingItems[index].icon,
+                                      color: isPremiumItem ? Colors.amber : appTheme.textMainColor,
+                                      size: 35,
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 20),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            settingItems[index].label,
+                                            style: TextStyle(
+                                                fontFamily: "NotoSans",
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 20,
+                                                color: appTheme.textMainColor),
+                                          ),
+                                          Text(
+                                            settingItems[index].description,
+                                            style: TextStyle(
+                                              fontFamily: "NunitoSans",
+                                              color: isPremiumItem
+                                                  ? appTheme.accentColor
+                                                  : appTheme.textSubColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Icon(
+                                  Icons.keyboard_arrow_right_rounded,
+                                  color: appTheme.textMainColor,
+                                  size: 30,
+                                )
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               )
             ],
           ),

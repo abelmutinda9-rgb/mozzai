@@ -16,8 +16,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 class DesktopControls extends StatefulWidget {
+  final bool remoteMode;
+
   const DesktopControls({
     super.key,
+    this.remoteMode = false,
   });
 
   @override
@@ -37,6 +40,13 @@ class _DesktopControlsState extends State<DesktopControls> {
 
   void keyListener(KeyEvent key) async {
     if (key is KeyUpEvent) return;
+    if (widget.remoteMode && (key.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        key.logicalKey == LogicalKeyboardKey.arrowRight ||
+        key.logicalKey == LogicalKeyboardKey.arrowUp ||
+        key.logicalKey == LogicalKeyboardKey.arrowDown)) {
+      // Let TV focus traversal and focused sliders use the D-pad normally.
+      return;
+    }
     switch (key.logicalKey) {
       case LogicalKeyboardKey.space:
       case LogicalKeyboardKey.mediaPlayPause:

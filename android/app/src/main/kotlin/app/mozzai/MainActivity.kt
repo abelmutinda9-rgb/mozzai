@@ -1,4 +1,4 @@
-package app.animestream
+package app.mozzai
 
 import android.widget.Toast
 import android.os.Looper

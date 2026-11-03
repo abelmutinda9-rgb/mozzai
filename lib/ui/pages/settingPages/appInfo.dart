@@ -136,7 +136,7 @@ class _AppInfoSettingState extends State<AppInfoSetting> {
         ),
         SizedBox(height: 15),
         Text(
-          "animestream",
+          "MOZZAI",
           style: TextStyle(
             color: appTheme.textMainColor,
             fontFamily: "Poppins",

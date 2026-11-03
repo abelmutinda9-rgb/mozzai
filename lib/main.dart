@@ -18,6 +18,7 @@ import 'package:animestream/core/anime/providers/animeonsen.dart';
 import 'package:animestream/core/app/logging.dart';
 import 'package:animestream/core/app/runtimeDatas.dart';
 import 'package:animestream/core/app/version.dart';
+import 'package:animestream/core/services/mozzai_subscription_service.dart';
 import 'package:animestream/core/data/preferences.dart';
 import 'package:animestream/core/data/settings.dart';
 import 'package:animestream/core/data/theme.dart';
@@ -55,6 +56,9 @@ void main(List<String> args) async {
     await Hive.initFlutter(!Platform.isAndroid ? "animestream" : null);
 
     await loadAndAssignSettings();
+
+    // Verify entitlement asynchronously; a temporary network failure never grants Premium.
+    unawaited(MozzaiSubscriptionService.instance.initAndVerify());
 
     if (!Platform.isAndroid) {
       fvp.registerWith(options: {
@@ -311,7 +315,7 @@ class _AnimeStreamState extends State<AnimeStream> {
           final themeProvider = Provider.of<AppProvider>(context);
 
           return MaterialApp(
-            title: 'Animestream',
+            title: 'MOZZAI',
             navigatorKey: AnimeStream.navigatorKey,
             scaffoldMessengerKey: AnimeStream.snackbarKey,
             theme: ThemeData(

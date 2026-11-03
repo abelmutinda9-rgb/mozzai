@@ -27,7 +27,7 @@ if (keystorePropertiesFile.exists()) {
 
 
 android {
-    namespace = "app.animestream"
+    namespace = "app.mozzai"
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
@@ -49,7 +49,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "app.animestream"
+        applicationId = "app.mozzai"
         minSdk = 24
         targetSdk = 35
         versionCode = flutterVersionCode.toInt()
