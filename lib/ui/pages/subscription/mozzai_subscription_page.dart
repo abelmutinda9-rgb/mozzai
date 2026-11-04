@@ -212,12 +212,33 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
   }
 
   Widget _buildHeaderCard(bool isPremium, MozzaiSubscription? sub) {
+    final bool isTrial = sub?.isTrial == true;
+    final String badgeLabel = isPremium
+        ? (isTrial ? "FREE TRIAL ACTIVE" : "MOZZAI PREMIUM ACTIVE")
+        : (sub?.status == 'expired' ? "TRIAL / PLAN EXPIRED" : "MOZZAI ACCESS");
+
+    final String titleText = isPremium
+        ? (isTrial
+            ? "2-Day Free Trial (${sub?.daysRemaining ?? 0}d remaining)"
+            : "Premium Active (${sub?.daysRemaining ?? 0}d remaining)")
+        : (sub?.status == 'expired'
+            ? "Free Trial Expired"
+            : "Unlock Unlimited Streaming");
+
+    final String subText = isPremium
+        ? "Expires on: ${sub?.expiresAt?.toLocal().toString().split('.')[0] ?? 'N/A'}"
+        : (sub?.status == 'expired'
+            ? "Your 2-day trial has ended. Subscribe for KSh 70 to continue."
+            : "2-Day Free Trial on first install • KSh 70 / 30 Days renewal");
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            appTheme.accentColor.withOpacity(0.25),
+            isPremium
+                ? (isTrial ? Colors.cyan.withOpacity(0.2) : appTheme.accentColor.withOpacity(0.25))
+                : Colors.redAccent.withOpacity(0.15),
             appTheme.backgroundSubColor,
           ],
           begin: Alignment.topLeft,
@@ -225,7 +246,9 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isPremium ? Colors.amber : appTheme.accentColor.withOpacity(0.4),
+          color: isPremium
+              ? (isTrial ? Colors.cyanAccent : Colors.amber)
+              : (sub?.status == 'expired' ? Colors.redAccent : appTheme.accentColor.withOpacity(0.4)),
           width: 2,
         ),
       ),
@@ -234,12 +257,16 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isPremium ? Colors.amber.withOpacity(0.2) : appTheme.accentColor.withOpacity(0.2),
+              color: isPremium
+                  ? (isTrial ? Colors.cyan.withOpacity(0.2) : Colors.amber.withOpacity(0.2))
+                  : Colors.redAccent.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isPremium ? Icons.workspace_premium_rounded : Icons.lock_open_rounded,
-              color: isPremium ? Colors.amber : appTheme.accentColor,
+              isPremium
+                  ? (isTrial ? Icons.hourglass_top_rounded : Icons.workspace_premium_rounded)
+                  : Icons.lock_outline_rounded,
+              color: isPremium ? (isTrial ? Colors.cyanAccent : Colors.amber) : Colors.redAccent,
               size: 40,
             ),
           ),
@@ -249,9 +276,9 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isPremium ? "ACTIVE SUBSCRIPTION" : "MOZZAI PREMIUM ACCESS",
+                  badgeLabel,
                   style: TextStyle(
-                    color: isPremium ? Colors.amber : appTheme.accentColor,
+                    color: isPremium ? (isTrial ? Colors.cyanAccent : Colors.amber) : Colors.redAccent,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
@@ -259,9 +286,7 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isPremium
-                      ? "Premium Active (${sub?.daysRemaining ?? 0} days remaining)"
-                      : "Unlock Unlimited Streaming",
+                  titleText,
                   style: TextStyle(
                     color: appTheme.textMainColor,
                     fontSize: 20,
@@ -271,9 +296,7 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isPremium
-                      ? "Expires on: ${sub?.expiresAt?.toLocal().toString().split('.')[0] ?? 'N/A'}"
-                      : "Direct M-Pesa STK Push • Device-associated access",
+                  subText,
                   style: TextStyle(
                     color: appTheme.textSubColor,
                     fontSize: 13,
@@ -315,7 +338,7 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "KSh 60 / 30 Days",
+                  "KSh 70 / 30 Days",
                   style: TextStyle(
                     color: appTheme.onAccent,
                     fontWeight: FontWeight.bold,
@@ -326,6 +349,7 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
             ],
           ),
           const SizedBox(height: 16),
+          _buildFeatureItem(Icons.card_giftcard_rounded, "Automatic 2-day free trial on first install (device-bound)"),
           _buildFeatureItem(Icons.play_circle_fill_rounded, "Stream all anime series, movies, and episodes"),
           _buildFeatureItem(Icons.hd_rounded, "Full HD 1080p and high-bitrate streaming"),
           _buildFeatureItem(Icons.download_for_offline_rounded, "Fast downloading and offline viewing"),
@@ -480,7 +504,7 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
                 Icon(Icons.payment_rounded, color: appTheme.onAccent),
                 const SizedBox(width: 10),
                 Text(
-                  "Pay KSh 60 with M-Pesa",
+                  "Pay KSh 70 with M-Pesa",
                   style: TextStyle(
                     color: appTheme.onAccent,
                     fontSize: 16,
@@ -496,21 +520,29 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
   }
 
   Widget _buildActivePremiumCard(MozzaiSubscription sub) {
+    final bool isTrial = sub.isTrial;
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: appTheme.backgroundSubColor,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isTrial ? Colors.cyanAccent.withOpacity(0.3) : Colors.greenAccent.withOpacity(0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 28),
+              Icon(
+                isTrial ? Icons.timer_outlined : Icons.check_circle_rounded,
+                color: isTrial ? Colors.cyanAccent : Colors.greenAccent,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               Text(
-                "Subscription Active",
+                isTrial ? "2-Day Free Trial Active" : "MOZZAI Premium Active",
                 style: TextStyle(
                   color: appTheme.textMainColor,
                   fontSize: 18,
@@ -521,10 +553,11 @@ class _MozzaiSubscriptionPageState extends State<MozzaiSubscriptionPage> {
           ),
           const SizedBox(height: 14),
           Text(
-            "Your MOZZAI Premium subscription is active on this device. You have full access to stream any anime at maximum quality.",
+            isTrial
+                ? "Your 2-day free trial is currently active on this device. Reinstalling or clearing data will not reset your trial. Once the 2 days end, pay KSh 70 to continue streaming."
+                : "Your MOZZAI Premium subscription is active on this device. You have full access to stream any anime at maximum quality.",
             style: TextStyle(color: appTheme.textSubColor, fontSize: 14),
           ),
-
         ],
       ),
     );

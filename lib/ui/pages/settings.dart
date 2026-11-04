@@ -35,7 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingItem(
         icon: Icons.workspace_premium_rounded,
         label: "MOZZAI Premium",
-        description: "M-Pesa KSh 60 / 30 Days",
+        description: "M-Pesa KSh 70 / 30 Days (2-Day Trial)",
         navigateTo: const MozzaiSubscriptionPage()),
     SettingItem(
         icon: Icons.account_circle,

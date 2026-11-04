@@ -18,6 +18,7 @@ class MozzaiSubscription {
   final DateTime? expiresAt;
   final bool isPremium;
   final int daysRemaining;
+  final bool isTrial;
 
   const MozzaiSubscription({
     required this.deviceId,
@@ -27,6 +28,7 @@ class MozzaiSubscription {
     this.expiresAt,
     required this.isPremium,
     required this.daysRemaining,
+    this.isTrial = false,
   });
 
   factory MozzaiSubscription.empty(String deviceId) {
@@ -36,18 +38,22 @@ class MozzaiSubscription {
       planName: 'MOZZAI Premium',
       isPremium: false,
       daysRemaining: 0,
+      isTrial: false,
     );
   }
 
   factory MozzaiSubscription.fromJson(Map<String, dynamic> json) {
+    final plan = json['plan_name'] as String? ?? 'MOZZAI Premium';
+    final trialFlag = json['is_trial'] == true || plan.toLowerCase().contains('trial');
     return MozzaiSubscription(
       deviceId: json['device_id'] as String? ?? '',
       status: json['status'] as String? ?? 'none',
-      planName: json['plan_name'] as String? ?? 'MOZZAI Premium',
+      planName: plan,
       startsAt: json['starts_at'] != null ? DateTime.tryParse(json['starts_at']) : null,
       expiresAt: json['expires_at'] != null ? DateTime.tryParse(json['expires_at']) : null,
       isPremium: json['is_premium'] == true,
       daysRemaining: (json['days_remaining'] as num?)?.toInt() ?? 0,
+      isTrial: trialFlag,
     );
   }
 }
