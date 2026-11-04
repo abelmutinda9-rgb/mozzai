@@ -81,14 +81,34 @@ class MozzaiSubscriptionService {
         return storedId;
       }
 
-      final random = Random.secure();
-      final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-      final deviceId = 'mozzai_' + sha256.convert(bytes).toString();
-      await _secureStorage.write(key: _storageKeyDeviceId, value: deviceId);
-      final persisted = await _secureStorage.read(key: _storageKeyDeviceId);
-      if (persisted != deviceId) {
-        throw StateError('Secure device identity could not be persisted');
+      String deviceId;
+      if (Platform.isAndroid) {
+        try {
+          final androidInfo = await DeviceInfoPlugin().androidInfo;
+          // Deterministic Android hardware identity: survives app reinstallation and data clears
+          final seed = [
+            'mozzai_android_v2',
+            androidInfo.brand,
+            androidInfo.model,
+            androidInfo.device,
+            androidInfo.board,
+            androidInfo.hardware,
+            androidInfo.fingerprint,
+            androidInfo.id,
+          ].join(':');
+          deviceId = 'mozzai_' + sha256.convert(utf8.encode(seed)).toString();
+        } catch (_) {
+          final random = Random.secure();
+          final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+          deviceId = 'mozzai_' + sha256.convert(bytes).toString();
+        }
+      } else {
+        final random = Random.secure();
+        final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+        deviceId = 'mozzai_' + sha256.convert(bytes).toString();
       }
+
+      await _secureStorage.write(key: _storageKeyDeviceId, value: deviceId);
       _cachedDeviceId = deviceId;
       return deviceId;
     } catch (e) {

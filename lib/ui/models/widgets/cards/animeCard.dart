@@ -127,20 +127,23 @@ class _AnimeCardState extends State<AnimeCard> {
                             : width,
                     margin: EdgeInsets.only(bottom: 10, top: widget.isMobile ? 0 : 5),
                     decoration: BoxDecoration(
-                      border: widget.isMobile || Platform.isWindows || Platform.isLinux
-                          ? null
-                          : isFocused
-                              ? Border.all(
-                                  color: appTheme.accentColor,
-                                  strokeAlign: BorderSide.strokeAlignOutside,
-                                  width: 2,
-                                )
-                              : null,
-                      borderRadius: BorderRadius.circular(widget.isMobile
-                          ? 20
-                          : isFocused
-                              ? 5
-                              : 10),
+                      border: isFocused
+                          ? Border.all(
+                              color: appTheme.accentColor,
+                              strokeAlign: BorderSide.strokeAlignOutside,
+                              width: 3,
+                            )
+                          : null,
+                      borderRadius: BorderRadius.circular(isFocused ? 12 : 20),
+                      boxShadow: isFocused
+                          ? [
+                              BoxShadow(
+                                color: appTheme.accentColor.withAlpha(140),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : null,
                     ),
                     clipBehavior: Clip.hardEdge,
                     child: CachedNetworkImage(

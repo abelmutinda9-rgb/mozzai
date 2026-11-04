@@ -153,7 +153,7 @@ class MainNavProvider extends ChangeNotifier {
                 storedUserData = user,
                 Logs.app.log("[AUTHENTICATION] ${storedUserData?.name} Login Successful"),
                 loadListsForHome(userName: user.name),
-                // loadDiscoverItems(),
+                loadDiscoverItems(),
               })
           .catchError((err) async {
         if (err is AnilistApiException &&
@@ -171,14 +171,14 @@ class MainNavProvider extends ChangeNotifier {
         loadListsForHome();
 
         // lets let the discover page be lazy loaded
-        // loadDiscoverItems(); 
+        loadDiscoverItems(); 
 
         //return statement so that linter would shut up!
         return <void>{};
       });
     } else {
       loadListsForHome();
-      // loadDiscoverItems(); // lets let the discover page be lazy loaded
+      loadDiscoverItems();
     }
   }
 

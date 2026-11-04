@@ -1,3 +1,4 @@
+import 'package:animestream/ui/models/widgets/cards/animeCard.dart';
 import 'dart:io';
 
 import 'package:animestream/core/app/logging.dart';
@@ -30,16 +31,32 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final ScrollController _recentlyUpdatedScrollController = ScrollController();
+  final ScrollController _recommendedScrollController = ScrollController();
+  final ScrollController _trendingScrollController = ScrollController();
+
+  void _onProviderUpdate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    widget.mainNavProvider.addListener(_onProviderUpdate);
+    if (!widget.mainNavProvider.discoverDataLoaded) {
+      widget.mainNavProvider.loadDiscoverItems().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
 
-    //check login status
-    // AniListLogin().isAnilistLoggedIn().then(
-    //       (loggedIn) => setState(() {
-    //         isLoggedIn = loggedIn;
-    //       }),
-    //     );
+  @override
+  void dispose() {
+    widget.mainNavProvider.removeListener(_onProviderUpdate);
+    _recentlyUpdatedScrollController.dispose();
+    _recommendedScrollController.dispose();
+    _trendingScrollController.dispose();
+    super.dispose();
   }
 
   List<HomePageList> recentlyWatched = [];
@@ -135,10 +152,27 @@ class _HomeState extends State<Home> {
                               )
                             : null,
                       ),
-                      _titleAndList("Continue Watching", widget.mainNavProvider.recentlyWatched,
-                          showRefreshIndication: refreshing),
-                      divider(),
+                      if (widget.mainNavProvider.recentlyWatched.items.isNotEmpty) ...[
+                        _titleAndList("Continue Watching", widget.mainNavProvider.recentlyWatched,
+                            showRefreshIndication: refreshing),
+                        divider(),
+                      ],
                       _titleAndList("Aired This Season", widget.mainNavProvider.currentlyAiring),
+                      if (widget.mainNavProvider.recentlyUpdatedList.isNotEmpty) ...[
+                        divider(),
+                        _animeSection("Recently Updated", widget.mainNavProvider.recentlyUpdatedList,
+                            _recentlyUpdatedScrollController),
+                      ],
+                      if (widget.mainNavProvider.recommendedList.isNotEmpty) ...[
+                        divider(),
+                        _animeSection("Popular & Recommended", widget.mainNavProvider.recommendedList,
+                            _recommendedScrollController),
+                      ],
+                      if (widget.mainNavProvider.thisSeason.isNotEmpty) ...[
+                        divider(),
+                        _animeSection("Trending This Season", widget.mainNavProvider.thisSeason,
+                            _trendingScrollController),
+                      ],
                       if (widget.mainNavProvider.loggedIn) ...[
                         divider(),
                         _titleAndList("From Your Planned", widget.mainNavProvider.plannedList),
@@ -338,6 +372,33 @@ class _HomeState extends State<Home> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
+    );
+  }
+
+  Widget _animeSection(String title, List<AnimeCard> list, ScrollController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 15, right: 15, bottom: 8),
+          child: Text(
+            title,
+            style: TextStyle(fontFamily: "Rubik", fontSize: 20, color: appTheme.textMainColor),
+          ),
+        ),
+        Container(
+          height: (list.firstOrNull?.isMobile ?? true) ? 220 : 265,
+          padding: const EdgeInsets.only(left: 10, right: 10),
+          child: ListView.builder(
+            controller: controller,
+            padding: EdgeInsets.zero,
+            itemCount: list.length,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (context, index) => list[index],
+          ),
+        ),
+      ],
     );
   }
 
