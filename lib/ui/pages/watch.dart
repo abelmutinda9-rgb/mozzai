@@ -11,8 +11,6 @@ import 'package:animestream/ui/models/widgets/player/controls.dart';
 import 'package:animestream/ui/models/widgets/player/gestureOverlay.dart';
 import 'package:animestream/ui/models/widgets/subtitles/subViewer.dart';
 import 'package:animestream/ui/models/widgets/subtitles/subtitleSettings.dart';
-import 'package:animestream/ui/pages/subscription/mozzai_subscription_page.dart';
-import 'package:animestream/core/services/mozzai_subscription_service.dart';
 import 'package:better_player/better_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -96,24 +94,6 @@ class _WatchState extends State<Watch> with WidgetsBindingObserver {
   void _initialize() async {
     /// Set black title bar
     context.read<AppProvider>().setTitlebarColor(appTheme.backgroundColor);
-
-    // Offline files remain available without a network check. Streaming requires
-    // a current server-verified MOZZAI Premium entitlement.
-    if (!widget.localSource) {
-      var subscription = await MozzaiSubscriptionService.instance.verifySubscription();
-      if (!mounted) return;
-      if (!subscription.isPremium) {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const MozzaiSubscriptionPage()),
-        );
-        if (!mounted) return;
-        subscription = await MozzaiSubscriptionService.instance.verifySubscription();
-        if (!subscription.isPremium) {
-          Navigator.of(context).pop();
-          return;
-        }
-      }
-    }
 
     final dataProvider = context.read<PlayerDataProvider>();
 
