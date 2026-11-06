@@ -42,29 +42,31 @@ class AnimeCard extends StatefulWidget {
 class _AnimeCardState extends State<AnimeCard> {
   bool isFocused = false;
   double width = Platform.isWindows || Platform.isLinux ? 150 : 110;
-  double height = Platform.isWindows || Platform.isLinux ? 200 : 160;
+  double height = Platform.isWindows || Platform.isLinux ? 210 : 160;
 
   void updateFocus(bool val) {
-    return setState(() {
-      isFocused = val;
-    });
+    if (mounted) {
+      setState(() {
+        isFocused = val;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: widget.isMobile ? width : width + 5,
-      margin: EdgeInsets.only(left: 5, right: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 5),
       child: InkWell(
         onHover: updateFocus,
         onFocusChange: updateFocus,
         splashFactory: NoSplash.splashFactory,
         focusColor: Colors.transparent,
         hoverColor: Colors.transparent,
-        overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         onTap: () {
           if (!widget.isAnime) return floatingSnackBar("Manga or Novels aren't supported");
-          if (widget.shouldNavigate)
+          if (widget.shouldNavigate) {
             Navigator.of(context)
                 .push(
               MaterialPageRoute(
@@ -76,6 +78,7 @@ class _AnimeCardState extends State<AnimeCard> {
                 .then((val) {
               widget.afterNavigation?.call();
             });
+          }
         },
         child: ContextMenu(
           menuItems: [
@@ -113,7 +116,7 @@ class _AnimeCardState extends State<AnimeCard> {
               Stack(
                 children: [
                   AnimatedContainer(
-                    duration: Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 200),
                     curve: Curves.linear,
                     height: widget.isMobile
                         ? height
@@ -125,21 +128,24 @@ class _AnimeCardState extends State<AnimeCard> {
                         : isFocused
                             ? width * 1.03
                             : width,
-                    margin: EdgeInsets.only(bottom: 10, top: widget.isMobile ? 0 : 5),
+                    margin: EdgeInsets.only(bottom: 8, top: widget.isMobile ? 0 : 5),
                     decoration: BoxDecoration(
                       border: isFocused
                           ? Border.all(
                               color: appTheme.accentColor,
                               strokeAlign: BorderSide.strokeAlignOutside,
-                              width: 3,
+                              width: 2.5,
                             )
-                          : null,
-                      borderRadius: BorderRadius.circular(isFocused ? 12 : 20),
+                          : Border.all(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              width: 0.5,
+                            ),
+                      borderRadius: BorderRadius.circular(10),
                       boxShadow: isFocused
                           ? [
                               BoxShadow(
-                                color: appTheme.accentColor.withAlpha(140),
-                                blurRadius: 12,
+                                color: appTheme.accentColor.withValues(alpha: 0.4),
+                                blurRadius: 14,
                                 spreadRadius: 2,
                               )
                             ]
@@ -148,46 +154,69 @@ class _AnimeCardState extends State<AnimeCard> {
                     clipBehavior: Clip.hardEdge,
                     child: CachedNetworkImage(
                       imageUrl: widget.imageUrl,
-                      fadeInDuration: Duration(milliseconds: 200),
+                      fadeInDuration: const Duration(milliseconds: 200),
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: appTheme.backgroundSubColor,
                         height: height,
                         width: width,
                       ),
+                      errorWidget: (context, url, error) {
+                        return Container(
+                          color: appTheme.backgroundSubColor,
+                          child: const Icon(Icons.broken_image, color: Colors.white24),
+                        );
+                      },
                     ),
                   ),
+                  // SUB | DUB Badge (Crunchyroll style)
+                  Positioned(
+                    top: widget.isMobile ? 5 : (isFocused ? 10 : 8),
+                    left: 5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.white12, width: 0.5),
+                      ),
+                      child: const Text(
+                        "SUB | DUB",
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Rating Badge
                   Positioned(
                     right: 0,
-                    bottom: 10,
-                    child: AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
+                    bottom: 8,
+                    child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(15),
-                            bottomRight: Radius.circular(widget.isMobile
-                                ? 15
-                                : isFocused
-                                    ? 4
-                                    : 9)),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        ),
                         color: appTheme.accentColor,
                       ),
-                      width: width / 2,
-                      padding: EdgeInsets.only(left: 5, right: 5, top: 2, bottom: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.star,
                             color: appTheme.onAccent,
-                            size: 13,
+                            size: 11,
                           ),
+                          const SizedBox(width: 2),
                           Text(
-                            " ${widget.rating ?? '??'}",
+                            "${widget.rating ?? '??'}",
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 11,
                               color: appTheme.onAccent,
                               fontFamily: "NotoSans",
                               fontWeight: FontWeight.bold,
@@ -196,7 +225,7 @@ class _AnimeCardState extends State<AnimeCard> {
                         ],
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
               Text(
@@ -205,16 +234,17 @@ class _AnimeCardState extends State<AnimeCard> {
                 maxLines: 2,
                 textAlign: TextAlign.left,
                 style: TextStyle(
-                    fontFamily: "NotoSans",
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: isFocused ? appTheme.accentColor : appTheme.textMainColor),
+                  fontFamily: "NotoSans",
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: isFocused ? appTheme.accentColor : appTheme.textMainColor,
+                ),
               ),
               if (widget.subText != null)
                 Text(
                   widget.subText!,
-                  style: TextStyle(fontFamily: "NunitoSans", color: appTheme.textSubColor),
-                )
+                  style: TextStyle(fontFamily: "NunitoSans", color: appTheme.textSubColor, fontSize: 11),
+                ),
             ],
           ),
         ),

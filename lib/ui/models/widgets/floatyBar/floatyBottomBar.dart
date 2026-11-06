@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:animestream/core/app/runtimeDatas.dart';
 import 'package:animestream/ui/models/widgets/floatyBar/controller.dart';
 import 'package:flutter/material.dart';
@@ -31,11 +32,11 @@ class FloatyBottomBar extends StatefulWidget {
     this.height = 50,
     this.bottomPadding = 10,
     this.backgroundColor = Colors.black,
-    this.accentColor = const Color(0xffcaf979),
+    this.accentColor = const Color(0xffF47521),
     this.animationDuration = const Duration(milliseconds: 200),
     this.detachGap = 5,
-    this.outerRadius = 20,
-    this.activeRadius = 20,
+    this.outerRadius = 24,
+    this.activeRadius = 24,
   });
 
   @override
@@ -89,91 +90,120 @@ class _FloatyBottomBarState extends State<FloatyBottomBar> {
       padding: EdgeInsets.only(bottom: bottomInset + widget.bottomPadding),
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
-          decoration: BoxDecoration(
-              color: appTheme.backgroundSubColor, borderRadius: BorderRadius.circular(widget.outerRadius + 2)),
-          padding: EdgeInsets.all(5),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: List.generate(widget.items.length, (i) {
-              final isActive = i == _currentIndex;
-              final hasLeftGap = i > 0 && hasGapBetween(i - 1, i);
-              final hasRightGap = i < lastIndex && hasGapBetween(i, i + 1);
-              final leftNeighborIsActive = i > 0 && (i - 1) == _currentIndex;
-              final rightNeighborIsActive = i < lastIndex && (i + 1) == _currentIndex;
-              final segmentRadius = Radius.circular(isActive ? widget.activeRadius : widget.outerRadius);
-              final activeFacingCornerRadius = Radius.circular(widget.outerRadius / 2);
-
-              return GestureDetector(
-                onTap: () => _onItemTap(i),
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: widget.animationDuration,
-                  curve: Curves.easeInOut,
-                  height: widget.height,
-                  margin: EdgeInsets.only(
-                    left: hasLeftGap ? widget.detachGap / 2 : 0,
-                    right: hasRightGap ? widget.detachGap / 2 : 0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isActive ? appTheme.accentColor : widget.accentColor.withAlpha(80)),
-                    borderRadius: BorderRadius.only(
-                      topLeft: (!isActive && leftNeighborIsActive)
-                          ? activeFacingCornerRadius
-                          : (i == 0 || hasLeftGap)
-                              ? segmentRadius
-                              : Radius.zero,
-                      bottomLeft: (!isActive && leftNeighborIsActive)
-                          ? activeFacingCornerRadius
-                          : (i == 0 || hasLeftGap)
-                              ? segmentRadius
-                              : Radius.zero,
-                      topRight: (!isActive && rightNeighborIsActive)
-                          ? activeFacingCornerRadius
-                          : (i == lastIndex || hasRightGap)
-                              ? segmentRadius
-                              : Radius.zero,
-                      bottomRight: (!isActive && rightNeighborIsActive)
-                          ? activeFacingCornerRadius
-                          : (i == lastIndex || hasRightGap)
-                              ? segmentRadius
-                              : Radius.zero,
-                    ),
-                  ),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isActive ? 16 : 18,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!isActive)
-                        Icon(
-                          widget.items[i].icon,
-                          size: 24,
-                          color: isActive ? appTheme.onAccent : appTheme.textMainColor,
-                        ),
-                      AnimatedSize(
-                        duration: widget.animationDuration,
-                        curve: Curves.easeInOut,
-                        child: isActive
-                            ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                // const SizedBox(width: 8),
-                                Text(widget.items[i].title,
-                                    style: TextStyle(
-                                      color: appTheme.onAccent,
-                                      fontFamily: "NotoSans",
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                    )),
-                              ])
-                            : const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.outerRadius + 4),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: appTheme.backgroundSubColor.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(widget.outerRadius + 4),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1,
                 ),
-              );
-            }),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: List.generate(widget.items.length, (i) {
+                  final isActive = i == _currentIndex;
+                  final hasLeftGap = i > 0 && hasGapBetween(i - 1, i);
+                  final hasRightGap = i < lastIndex && hasGapBetween(i, i + 1);
+                  final leftNeighborIsActive = i > 0 && (i - 1) == _currentIndex;
+                  final rightNeighborIsActive = i < lastIndex && (i + 1) == _currentIndex;
+                  final segmentRadius = Radius.circular(isActive ? widget.activeRadius : widget.outerRadius);
+                  final activeFacingCornerRadius = Radius.circular(widget.outerRadius / 2);
+
+                  return GestureDetector(
+                    onTap: () => _onItemTap(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: widget.animationDuration,
+                      curve: Curves.easeInOut,
+                      height: widget.height,
+                      margin: EdgeInsets.only(
+                        left: hasLeftGap ? widget.detachGap / 2 : 0,
+                        right: hasRightGap ? widget.detachGap / 2 : 0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive ? appTheme.accentColor : Colors.transparent,
+                        borderRadius: BorderRadius.only(
+                          topLeft: (!isActive && leftNeighborIsActive)
+                              ? activeFacingCornerRadius
+                              : (i == 0 || hasLeftGap)
+                                  ? segmentRadius
+                                  : Radius.zero,
+                          bottomLeft: (!isActive && leftNeighborIsActive)
+                              ? activeFacingCornerRadius
+                              : (i == 0 || hasLeftGap)
+                                  ? segmentRadius
+                                  : Radius.zero,
+                          topRight: (!isActive && rightNeighborIsActive)
+                              ? activeFacingCornerRadius
+                              : (i == lastIndex || hasRightGap)
+                                  ? segmentRadius
+                                  : Radius.zero,
+                          bottomRight: (!isActive && rightNeighborIsActive)
+                              ? activeFacingCornerRadius
+                              : (i == lastIndex || hasRightGap)
+                                  ? segmentRadius
+                                  : Radius.zero,
+                        ),
+                        boxShadow: isActive
+                            ? [
+                                BoxShadow(
+                                  color: appTheme.accentColor.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            : null,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isActive ? 18 : 18,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.items[i].icon,
+                            size: 22,
+                            color: isActive ? appTheme.onAccent : appTheme.textSubColor,
+                          ),
+                          AnimatedSize(
+                            duration: widget.animationDuration,
+                            curve: Curves.easeInOut,
+                            child: isActive
+                                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      widget.items[i].title,
+                                      style: TextStyle(
+                                        color: appTheme.onAccent,
+                                        fontFamily: "NotoSans",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ])
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),

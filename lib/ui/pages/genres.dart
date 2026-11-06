@@ -483,20 +483,25 @@ class _GenresPageState extends State<GenresPage> {
                                               setDialogState(() {});
                                             },
                                             child: AnimatedContainer(
-                                              duration: Duration(milliseconds: 150),
-                                              padding: EdgeInsets.only(left: 10, right: 10),
+                                              duration: const Duration(milliseconds: 150),
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                               height: 40,
                                               alignment: Alignment.center,
                                               decoration: BoxDecoration(
                                                   color: selectedList.contains(e)
                                                       ? appTheme.accentColor
                                                       : appTheme.backgroundSubColor,
-                                                  borderRadius: BorderRadius.circular(13)),
+                                                  border: Border.all(
+                                                      color: selectedList.contains(e)
+                                                          ? appTheme.accentColor
+                                                          : Colors.white.withValues(alpha: 0.12),
+                                                      width: 1),
+                                                  borderRadius: BorderRadius.circular(20)),
                                               child: Text(
                                                 e,
                                                 style: TextStyle(
                                                     color: selectedList.contains(e)
-                                                        ? appTheme.backgroundColor
+                                                        ? appTheme.onAccent
                                                         : appTheme.textMainColor,
                                                     fontFamily: "NotoSans",
                                                     fontWeight: FontWeight.bold),
@@ -549,18 +554,24 @@ class _GenresPageState extends State<GenresPage> {
                         setChildState(() {});
                       },
                       child: AnimatedContainer(
-                        duration: Duration(milliseconds: 150),
-                        padding: EdgeInsets.only(left: 10, right: 10),
-                        height: 40,
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        height: 38,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                             color: selectedList.contains(e) ? appTheme.accentColor : appTheme.backgroundSubColor,
-                            borderRadius: BorderRadius.circular(13)),
+                            border: Border.all(
+                                color: selectedList.contains(e)
+                                    ? appTheme.accentColor
+                                    : Colors.white.withValues(alpha: 0.12),
+                                width: 1),
+                            borderRadius: BorderRadius.circular(20)),
                         child: Text(
                           e,
                           style: TextStyle(
-                              color: selectedList.contains(e) ? appTheme.backgroundColor : appTheme.textMainColor,
+                              color: selectedList.contains(e) ? appTheme.onAccent : appTheme.textMainColor,
                               fontFamily: "NotoSans",
+                              fontSize: 13,
                               fontWeight: FontWeight.bold),
                         ),
                       ),

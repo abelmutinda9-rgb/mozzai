@@ -1,21 +1,25 @@
-import 'package:animestream/ui/models/widgets/cards/animeCard.dart';
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:animestream/core/app/logging.dart';
-import 'package:animestream/ui/models/providers/mainNavProvider.dart';
-import 'package:animestream/ui/models/screenType.dart';
-import 'package:flutter/material.dart';
-
 import 'package:animestream/core/app/runtimeDatas.dart';
 import 'package:animestream/core/commons/types.dart';
 import 'package:animestream/core/data/watching.dart';
 import 'package:animestream/core/database/anilist/types.dart';
-import 'package:animestream/ui/models/widgets/cards.dart';
-import 'package:animestream/ui/models/widgets/header.dart';
+import 'package:animestream/ui/models/providers/mainNavProvider.dart';
+import 'package:animestream/ui/models/screenType.dart';
 import 'package:animestream/ui/models/snackBar.dart';
+import 'package:animestream/ui/models/widgets/cards.dart';
+import 'package:animestream/ui/models/widgets/cards/animeCard.dart';
+import 'package:animestream/ui/pages/downloads.dart';
+import 'package:animestream/ui/pages/info.dart';
 import 'package:animestream/ui/pages/lists.dart';
 import 'package:animestream/ui/pages/settingPages/common.dart';
 import 'package:animestream/ui/pages/settingPages/stats.dart';
+import 'package:animestream/ui/pages/settings.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 class Home extends StatefulWidget {
@@ -35,8 +39,29 @@ class _HomeState extends State<Home> {
   final ScrollController _recommendedScrollController = ScrollController();
   final ScrollController _trendingScrollController = ScrollController();
 
+  final PageController _heroPageController = PageController();
+  int _heroCurrentPage = 0;
+  Timer? _heroTimer;
+
   void _onProviderUpdate() {
     if (mounted) setState(() {});
+  }
+
+  void _startHeroTimer() {
+    _heroTimer?.cancel();
+    _heroTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted) return;
+      final trending = widget.mainNavProvider.trendingList;
+      if (trending.isNotEmpty && _heroPageController.hasClients) {
+        final total = trending.length.clamp(1, 10);
+        _heroCurrentPage = (_heroCurrentPage + 1) % total;
+        _heroPageController.animateToPage(
+          _heroCurrentPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+    });
   }
 
   @override
@@ -48,10 +73,13 @@ class _HomeState extends State<Home> {
         if (mounted) setState(() {});
       });
     }
+    _startHeroTimer();
   }
 
   @override
   void dispose() {
+    _heroTimer?.cancel();
+    _heroPageController.dispose();
     widget.mainNavProvider.removeListener(_onProviderUpdate);
     _recentlyUpdatedScrollController.dispose();
     _recommendedScrollController.dispose();
@@ -60,22 +88,20 @@ class _HomeState extends State<Home> {
   }
 
   List<HomePageList> recentlyWatched = [];
-  // List<HomePageList> currentlyAiring = [];
-
   bool refreshing = false;
-  // bool isLoggedIn = false;
 
   Future<void> getLists({String? userName}) async {
     try {
-      if (mounted)
+      if (mounted) {
         setState(() {
           refreshing = true;
         });
+      }
       List<UserAnimeListItem> watched = await getWatchedList(userName: userName);
       if (watched.length > 40) watched = watched.sublist(0, 40);
       recentlyWatched = [];
-      watched.forEach(
-        (item) => recentlyWatched.add(
+      for (final item in watched) {
+        recentlyWatched.add(
           HomePageList(
             coverImage: item.coverImage,
             id: item.id,
@@ -84,22 +110,24 @@ class _HomeState extends State<Home> {
             totalEpisodes: item.episodes,
             watchedEpisodeCount: item.watchProgress,
           ),
-        ),
-      );
+        );
+      }
 
       widget.mainNavProvider.updateWatchedList(recentlyWatched);
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           refreshing = false;
         });
+      }
     } catch (err) {
       Logs.app.log(err.toString());
-      if (currentUserSettings!.showErrors != null && currentUserSettings!.showErrors!) floatingSnackBar(err.toString());
-      if (mounted)
+      if (currentUserSettings?.showErrors ?? false) floatingSnackBar(err.toString());
+      if (mounted) {
         setState(() {
           refreshing = false;
         });
+      }
     }
   }
 
@@ -110,7 +138,6 @@ class _HomeState extends State<Home> {
     return Scaffold(
       backgroundColor: appTheme.backgroundColor,
       body: SmartRefresher(
-        // reset the controller, to prevent error: "Dont use one controller for multiple SmartRefresher"
         controller: widget.mainNavProvider.homeRefreshController = RefreshController(initialRefresh: false),
         onRefresh: () async {
           await widget.mainNavProvider.refresh(refreshPage: 0, fromSettings: false);
@@ -120,7 +147,7 @@ class _HomeState extends State<Home> {
           color: appTheme.accentColor,
         ),
         child: Container(
-          padding: pagePadding(context).copyWith(left: 0),
+          padding: pagePadding(context).copyWith(left: 0, right: 0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -130,17 +157,18 @@ class _HomeState extends State<Home> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      buildHeader("Home", context, afterNavigation: () {
-                        if (mounted) setState(() {});
-                      }),
+                      // Crunchyroll-style Top Hero Spotlight
+                      _heroSpotlight(),
+
+                      // Logged-in user stats bar
                       AnimatedSwitcher(
-                        duration: Duration(milliseconds: 400),
+                        duration: const Duration(milliseconds: 400),
                         child: storedUserData != null
                             ? Align(
                                 alignment: Alignment.center,
                                 child: Container(
-                                  margin: EdgeInsets.only(left: 20, bottom: 20, right: 20),
-                                  constraints: BoxConstraints(maxWidth: 450),
+                                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  constraints: const BoxConstraints(maxWidth: 450),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -152,27 +180,40 @@ class _HomeState extends State<Home> {
                               )
                             : null,
                       ),
+
+                      // Continue Watching shelf (with 16:9 cards & orange progress bar)
                       if (widget.mainNavProvider.recentlyWatched.items.isNotEmpty) ...[
+                        const SizedBox(height: 12),
                         _titleAndList("Continue Watching", widget.mainNavProvider.recentlyWatched,
                             showRefreshIndication: refreshing),
                         divider(),
                       ],
-                      _titleAndList("Aired This Season", widget.mainNavProvider.currentlyAiring),
-                      if (widget.mainNavProvider.recentlyUpdatedList.isNotEmpty) ...[
+
+                      // Trending This Season
+                      if (widget.mainNavProvider.thisSeason.isNotEmpty) ...[
+                        _animeSection(
+                            "Trending This Season", widget.mainNavProvider.thisSeason, _trendingScrollController),
                         divider(),
+                      ],
+
+                      // Recently Updated Episodes
+                      if (widget.mainNavProvider.recentlyUpdatedList.isNotEmpty) ...[
                         _animeSection("Recently Updated", widget.mainNavProvider.recentlyUpdatedList,
                             _recentlyUpdatedScrollController),
+                        divider(),
                       ],
+
+                      // Aired This Season
+                      _titleAndList("Aired This Season", widget.mainNavProvider.currentlyAiring),
+
+                      // Popular & Recommended
                       if (widget.mainNavProvider.recommendedList.isNotEmpty) ...[
                         divider(),
                         _animeSection("Popular & Recommended", widget.mainNavProvider.recommendedList,
                             _recommendedScrollController),
                       ],
-                      if (widget.mainNavProvider.thisSeason.isNotEmpty) ...[
-                        divider(),
-                        _animeSection("Trending This Season", widget.mainNavProvider.thisSeason,
-                            _trendingScrollController),
-                      ],
+
+                      // From Your Planned
                       if (widget.mainNavProvider.loggedIn) ...[
                         divider(),
                         _titleAndList("From Your Planned", widget.mainNavProvider.plannedList),
@@ -194,15 +235,442 @@ class _HomeState extends State<Home> {
     );
   }
 
+  Widget _heroSpotlight() {
+    final trending = widget.mainNavProvider.trendingList;
+    final double heroHeight = (Platform.isWindows || Platform.isLinux) ? 460.0 : 410.0;
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    if (trending.isEmpty) {
+      return Container(
+        height: heroHeight,
+        width: double.infinity,
+        color: appTheme.backgroundColor,
+        child: Stack(
+          children: [
+            _topFloatingBar(topPadding),
+            Center(
+              child: CircularProgressIndicator(
+                color: appTheme.accentColor,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final totalPages = trending.length.clamp(1, 10);
+
+    return SizedBox(
+      height: heroHeight,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _heroPageController,
+            itemCount: totalPages,
+            onPageChanged: (idx) {
+              setState(() {
+                _heroCurrentPage = idx;
+              });
+            },
+            itemBuilder: (context, index) {
+              final item = trending[index];
+              final titles = item.title;
+              final defaultTitle = titles['english'] ?? titles['romaji'] ?? titles['title'] ?? '';
+              final preferNative = currentUserSettings?.nativeTitle ?? false;
+              final title = preferNative ? titles['native'] ?? defaultTitle : defaultTitle;
+              final rating = item.rating;
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => Info(id: item.id),
+                    ),
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Full-bleed backdrop art
+                    CachedNetworkImage(
+                      imageUrl: item.banner ?? item.cover,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      placeholder: (context, url) => Container(
+                        color: appTheme.backgroundSubColor,
+                      ),
+                      errorWidget: (context, url, error) => Image.asset(
+                        "lib/assets/images/chisato.jpeg",
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+
+                    // Top dark vignette for readable app bar
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 120,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.75),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Deep cinematic gradient fade into background
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: 260,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0.0, 0.4, 0.75, 1.0],
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.35),
+                              Colors.black.withValues(alpha: 0.8),
+                              appTheme.backgroundColor,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Bottom info overlay
+                    Positioned(
+                      bottom: 22,
+                      left: 16,
+                      right: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Anime Title
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontFamily: "Rubik",
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black87,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Badges Row: Rating + Genre Tags
+                          Row(
+                            children: [
+                              if (rating != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.accentColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.star, color: appTheme.onAccent, size: 12),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        "${(rating / 10).toStringAsFixed(1)}",
+                                        style: TextStyle(
+                                          color: appTheme.onAccent,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: item.genres.take(3).map((g) {
+                                      return Container(
+                                        margin: const EdgeInsets.only(right: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.55),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.white.withValues(alpha: 0.2),
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          g.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontFamily: "NotoSans",
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Crunchyroll "START WATCHING" & "DETAILS" Buttons
+                          Row(
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => Info(id: item.id),
+                                    ),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: appTheme.onAccent,
+                                  size: 24,
+                                ),
+                                label: Text(
+                                  "START WATCHING",
+                                  style: TextStyle(
+                                    fontFamily: "NotoSans",
+                                    color: appTheme.onAccent,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: appTheme.accentColor,
+                                  elevation: 4,
+                                  shadowColor: appTheme.accentColor.withValues(alpha: 0.5),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => Info(id: item.id),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.info_outline_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                label: const Text(
+                                  "DETAILS",
+                                  style: TextStyle(
+                                    fontFamily: "NotoSans",
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                    width: 1,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          // Floating Top App Bar over hero
+          _topFloatingBar(topPadding),
+
+          // Hero Page Indicator Dots
+          Positioned(
+            bottom: 6,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(totalPages, (idx) {
+                final isSelected = idx == _heroCurrentPage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                  width: isSelected ? 16 : 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isSelected ? appTheme.accentColor : Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _topFloatingBar(double topPadding) {
+    return Positioned(
+      top: topPadding + 6,
+      left: 16,
+      right: 16,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              const Text(
+                "MOZZAI",
+                style: TextStyle(
+                  fontFamily: "Rubik",
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(color: Colors.black54, blurRadius: 8),
+                  ],
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.only(left: 3, top: 8),
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: appTheme.accentColor,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const DownloadsPage()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.4),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.download_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.of(context)
+                          .push(
+                        MaterialPageRoute(builder: (context) => const SettingsPage()),
+                      )
+                          .then((_) {
+                        getLists(userName: storedUserData?.name);
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.4),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.settings_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   AnimatedContainer _rightPanel() {
     return AnimatedContainer(
-      duration: Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: appTheme.backgroundSubColor.withAlpha(150),
+        color: appTheme.backgroundSubColor.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(16),
       ),
-      margin: EdgeInsets.all(24),
-      padding: EdgeInsets.all(8),
+      margin: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(8),
       width: selectedList != null ? null : 0,
       child: selectedList == null
           ? Container()
@@ -240,7 +708,6 @@ class _HomeState extends State<Home> {
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: Platform.isAndroid ? 140 : 180,
                         mainAxisExtent: Platform.isAndroid ? 220 : 265,
-                        // crossAxisCount: MediaQuery.of(context).orientation == Orientation.portrait ? 3 : 6,
                         childAspectRatio: 120 / 220,
                         mainAxisSpacing: 10,
                       ),
@@ -270,12 +737,12 @@ class _HomeState extends State<Home> {
     );
   }
 
-  _listButton() {
+  Widget _listButton() {
     return Expanded(
       flex: 4,
       child: Container(
-        height: 60,
-        margin: EdgeInsets.only(left: 10),
+        height: 56,
+        margin: const EdgeInsets.only(left: 10),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             elevation: 0,
@@ -284,30 +751,28 @@ class _HomeState extends State<Home> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => AnimeLists()))
+              .push(MaterialPageRoute(builder: (context) => const AnimeLists()))
               .then((val) => getLists(userName: storedUserData?.name)),
-          child: Container(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.folder_rounded,
-                  color: appTheme.textMainColor,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Text(
-                    "Lists",
-                    style: TextStyle(
-                      color: appTheme.textMainColor,
-                      fontFamily: "Poppins",
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.folder_rounded,
+                color: appTheme.textMainColor,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  "Lists",
+                  style: TextStyle(
+                    color: appTheme.textMainColor,
+                    fontFamily: "Poppins",
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -330,25 +795,26 @@ class _HomeState extends State<Home> {
           ),
           child: Container(
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
-            height: 60,
-            padding: EdgeInsets.all(10),
+            height: 56,
+            padding: const EdgeInsets.all(8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
                   backgroundImage: storedUserData!.avatar != null
                       ? NetworkImage(storedUserData!.avatar!)
-                      : AssetImage('lib/assets/images/chisato_AI.jpg') as ImageProvider,
+                      : const AssetImage('lib/assets/images/chisato_AI.jpg') as ImageProvider,
                 ),
                 Padding(
-                  padding: EdgeInsets.only(left: 10),
+                  padding: const EdgeInsets.only(left: 10),
                   child: Text(
                     storedUserData!.name,
                     style: TextStyle(
-                        fontFamily: "Poppins",
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: appTheme.textMainColor),
+                      fontFamily: "Poppins",
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: appTheme.textMainColor,
+                    ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -361,18 +827,8 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Center divider() {
-    return Center(
-      child: Container(
-        width: MediaQuery.of(context).size.width / 2,
-        margin: EdgeInsets.only(top: 15, bottom: 15),
-        height: 6,
-        decoration: BoxDecoration(
-          color: appTheme.accentColor.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
+  Widget divider() {
+    return const SizedBox(height: 24);
   }
 
   Widget _animeSection(String title, List<AnimeCard> list, ScrollController controller) {
@@ -381,18 +837,22 @@ class _HomeState extends State<Home> {
       children: [
         Container(
           alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.only(left: 15, right: 15, bottom: 8),
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 10),
           child: Text(
             title,
-            style: TextStyle(fontFamily: "Rubik", fontSize: 20, color: appTheme.textMainColor),
+            style: TextStyle(
+              fontFamily: "Rubik",
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: appTheme.textMainColor,
+            ),
           ),
         ),
-        Container(
+        SizedBox(
           height: (list.firstOrNull?.isMobile ?? true) ? 220 : 265,
-          padding: const EdgeInsets.only(left: 10, right: 10),
           child: ListView.builder(
             controller: controller,
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             itemCount: list.length,
             scrollDirection: Axis.horizontal,
             itemBuilder: (context, index) => list[index],
@@ -403,32 +863,36 @@ class _HomeState extends State<Home> {
   }
 
   Column _titleAndList(String title, AnimeListData<HomePageList> list, {bool showRefreshIndication = false}) {
+    final bool isContinueWatching = title == "Continue Watching";
+
     return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              alignment: Alignment.centerLeft,
-              // margin: EdgeInsets.only(top: 20),
-              padding: EdgeInsets.only(left: 15, right: 15),
-              child: Text(
+        Padding(
+          padding: const EdgeInsets.only(left: 16, right: 8, bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
                 title,
-                style: TextStyle(fontFamily: "Rubik", fontSize: 20, color: appTheme.textMainColor),
-              ),
-            ),
-            if (showRefreshIndication)
-              Container(
-                margin: EdgeInsets.only(left: 5),
-                height: 15,
-                width: 15,
-                child: CircularProgressIndicator(
-                  color: appTheme.accentColor,
-                  strokeWidth: 2,
+                style: TextStyle(
+                  fontFamily: "Rubik",
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  color: appTheme.textMainColor,
                 ),
               ),
-            Spacer(),
-            IconButton(
+              if (showRefreshIndication)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(
+                    color: appTheme.accentColor,
+                    strokeWidth: 2,
+                  ),
+                ),
+              const Spacer(),
+              IconButton(
                 onPressed: () {
                   if (context.screenType == ScreenType.expanded || context.screenType == ScreenType.large) {
                     setState(() {
@@ -437,88 +901,87 @@ class _HomeState extends State<Home> {
                     return;
                   }
                   showModalBottomSheet(
-                      context: context,
-                      showDragHandle: true,
-                      builder: (context) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16, bottom: 12),
-                              child: Text(
-                                title,
-                                style: textStyle(),
-                              ),
-                            ),
-                            Expanded(
-                              child: GridView.builder(
-                                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-                                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: Platform.isAndroid ? 140 : 180,
-                                  mainAxisExtent: Platform.isAndroid ? 220 : 260,
-                                  // crossAxisCount: MediaQuery.of(context).orientation == Orientation.portrait ? 3 : 6,
-                                  childAspectRatio: 120 / 220,
-                                  mainAxisSpacing: 10,
-                                ),
-                                itemCount: list.items.length,
-                                itemBuilder: (context, index) {
-                                  final item = list.items[index];
-                                  return Center(
-                                    child: Cards.animeCard(
-                                      item.id,
-                                      item.title['english'] ?? item.title['romaji'] ?? "",
-                                      item.coverImage,
-                                      rating: item.rating,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      });
-                },
-                icon: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 18,
-                ))
-          ],
-        ),
-        Container(
-          height: 160,
-          child: list.state.isError
-              ? Center(
-                  child: Container(
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          "lib/assets/images/ghost.png",
-                          color: Color.fromARGB(255, 80, 80, 80),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10.0),
-                          child: Text(
-                            "Aww... Something's wrong!",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: "NunitoSans",
-                              fontWeight: FontWeight.w500,
-                              color: Color.fromARGB(255, 80, 80, 80),
-                              fontSize: 18,
+                    context: context,
+                    showDragHandle: true,
+                    builder: (context) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, bottom: 12),
+                            child: Text(
+                              title,
+                              style: textStyle(),
                             ),
                           ),
+                          Expanded(
+                            child: GridView.builder(
+                              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+                              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: Platform.isAndroid ? 140 : 180,
+                                mainAxisExtent: Platform.isAndroid ? 220 : 260,
+                                childAspectRatio: 120 / 220,
+                                mainAxisSpacing: 10,
+                              ),
+                              itemCount: list.items.length,
+                              itemBuilder: (context, index) {
+                                final item = list.items[index];
+                                return Center(
+                                  child: Cards.animeCard(
+                                    item.id,
+                                    item.title['english'] ?? item.title['romaji'] ?? "",
+                                    item.coverImage,
+                                    rating: item.rating,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                icon: const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: isContinueWatching ? 185 : 160,
+          child: list.state.isError
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        "lib/assets/images/ghost.png",
+                        color: const Color.fromARGB(255, 80, 80, 80),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 10.0),
+                        child: Text(
+                          "Aww... Something's wrong!",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: "NunitoSans",
+                            fontWeight: FontWeight.w500,
+                            color: Color.fromARGB(255, 80, 80, 80),
+                            fontSize: 16,
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 )
               : list.state.isLoaded
-                  ? list.items.length > 0
-                      // condition where list loaded and has items
+                  ? list.items.isNotEmpty
                       ? ListView.builder(
-                          padding: EdgeInsets.zero,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           scrollDirection: Axis.horizontal,
                           itemCount: list.items.length,
                           itemBuilder: (context, index) {
@@ -527,52 +990,48 @@ class _HomeState extends State<Home> {
                             final normalTitle =
                                 item.title['english'] ?? item.title['romaji'] ?? item.title['title'] ?? '';
                             final title = preferNative ? item.title['native'] ?? normalTitle : normalTitle;
-                            return Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Cards.animeCardExtended(item.id, title, item.coverImage, item.rating ?? 0.0,
-                                  bannerImageUrl: item.coverImage,
-                                  watchedEpisodeCount: item.watchedEpisodeCount,
-                                  totalEpisodes: item.totalEpisodes,
-                                  afterNavigation: () => getLists(userName: storedUserData?.name)),
+                            return Cards.animeCardExtended(
+                              item.id,
+                              title,
+                              item.coverImage,
+                              item.rating ?? 0.0,
+                              bannerImageUrl: item.coverImage,
+                              watchedEpisodeCount: item.watchedEpisodeCount,
+                              totalEpisodes: item.totalEpisodes,
+                              afterNavigation: () => getLists(userName: storedUserData?.name),
                             );
-                          })
-
-                      // condition where list loaded but has no items
+                          },
+                        )
                       : Center(
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset(
-                                  "lib/assets/images/ghost.png",
-                                  color: Color.fromARGB(255, 80, 80, 80),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 10.0),
-                                  child: Text(
-                                    "Boo! Nothing's here!",
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: "NunitoSans",
-                                      fontWeight: FontWeight.w500,
-                                      color: Color.fromARGB(255, 80, 80, 80),
-                                      fontSize: 18,
-                                    ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                "lib/assets/images/ghost.png",
+                                color: const Color.fromARGB(255, 80, 80, 80),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 10.0),
+                                child: Text(
+                                  "Boo! Nothing's here!",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: "NunitoSans",
+                                    fontWeight: FontWeight.w500,
+                                    color: Color.fromARGB(255, 80, 80, 80),
+                                    fontSize: 16,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         )
-
-                  // Still in loading phase!
                   : Center(
                       child: CircularProgressIndicator(
                         color: appTheme.accentColor,
                       ),
                     ),
-        )
+        ),
       ],
     );
   }

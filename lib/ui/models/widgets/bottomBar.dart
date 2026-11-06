@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class BottomBarItem {
@@ -28,8 +29,8 @@ class AnimeStreamBottomBar extends StatefulWidget {
     this.height = 55,
     this.bottomPadding = 10,
     this.backgroundColor = Colors.black,
-    this.borderRadius = 0,
-    this.accentColor = const Color(0xffcaf979),
+    this.borderRadius = 16,
+    this.accentColor = const Color(0xffF47521),
   });
 
   @override
@@ -56,7 +57,6 @@ class _AnimeStreamBottomBarState extends State<AnimeStreamBottomBar> {
   void onItemTap(int val) {
     setState(() {
       widget.controller.currentIndex = val;
-      // currentIndex = val;
     });
   }
 
@@ -71,7 +71,7 @@ class _AnimeStreamBottomBarState extends State<AnimeStreamBottomBar> {
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedContainer(
-              duration: Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 200),
               alignment: Alignment.center,
               height: widget.height - 5,
               width: widget.width / widget.items.length,
@@ -98,20 +98,26 @@ class _AnimeStreamBottomBarState extends State<AnimeStreamBottomBar> {
                 ],
               ),
             ),
-            // if (isSelected)
             AnimatedSwitcher(
               duration: Duration(milliseconds: widget.controller.animDuration),
               transitionBuilder: (child, animation) {
                 return SlideTransition(
-                    position: animation.drive(Tween<Offset>(begin: Offset(0, 1), end: Offset(0, 0))), child: child);
+                    position: animation.drive(Tween<Offset>(begin: const Offset(0, 1), end: const Offset(0, 0))),
+                    child: child);
               },
               child: isSelected
                   ? Container(
-                      height: 5,
+                      height: 4,
                       width: (widget.width / widget.items.length) - 20,
                       decoration: BoxDecoration(
                         color: widget.accentColor,
-                        borderRadius: BorderRadius.only(topLeft: Radius.circular(5), topRight: Radius.circular(5)),
+                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(5), topRight: Radius.circular(5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: widget.accentColor.withValues(alpha: 0.5),
+                            blurRadius: 6,
+                          )
+                        ],
                       ),
                     )
                   : null,
@@ -128,16 +134,26 @@ class _AnimeStreamBottomBarState extends State<AnimeStreamBottomBar> {
       padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + widget.bottomPadding),
       child: Align(
         alignment: Alignment.bottomCenter,
-        // mainAxisAlignment: MainAxisAlignment.end,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(widget.borderRadius),
-          child: Container(
-            color: widget.backgroundColor,
-            width: widget.width,
-            child: Row(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: widget.backgroundColor.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1,
+                ),
+              ),
+              width: widget.width,
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 mainAxisSize: MainAxisSize.max,
-                children: generateWidgets()),
+                children: generateWidgets(),
+              ),
+            ),
           ),
         ),
       ),
@@ -180,22 +196,21 @@ class _BottomBarViewState extends State<BottomBarView> {
       throw Exception("Index out of bounds");
     }
 
-    // Generate list based on available views
     List<int> viewIndices = List.generate(widget.controller.length, (i) => i)
         .where((i) => !widget.controller.nonViewIndices.contains(i))
         .toList();
 
     final activeViewIndex = viewIndices.indexOf(widget.controller.currentIndex);
 
-    if (activeViewIndex == -1)
+    if (activeViewIndex == -1) {
       throw Exception(
         [
           "The index of active views recieved as -1.",
           "This usually means that you have only provided a non view buttons to controller"
         ].join(" "),
       );
+    }
 
-    // return widget.children[widget.controller.currentIndex];
     return AnimatedSwitcher(
       duration: Duration(milliseconds: widget.controller.animDuration),
       reverseDuration: Duration(milliseconds: widget.controller.animDuration),
@@ -214,7 +229,6 @@ class AnimeStreamBottomBarController {
   final int length;
   final List<int> nonViewIndices;
   final int animDuration;
-  // late int currentIndex;
 
   ValueNotifier<int> currentIndexNotifier;
 
