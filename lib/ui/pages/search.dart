@@ -181,7 +181,7 @@ class _SearchState extends State<Search> {
     );
   }
 
-  Container _searchOptions() {
+  Widget _searchOptions() {
     return Container(
       padding: const EdgeInsets.only(top: 10),
       child: Column(
@@ -239,7 +239,7 @@ class _SearchState extends State<Search> {
     );
   }
 
-  Container _searchResults() {
+  Widget _searchResults() {
     if (searchMode == 1) {
       if (tmdbResults.isEmpty) {
         if (textEditingController.text.length > 2) {
