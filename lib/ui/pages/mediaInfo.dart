@@ -1,11 +1,20 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:animestream/core/anime/downloader/downloadManager.dart';
+import 'package:animestream/core/anime/providers/types.dart';
 import 'package:animestream/core/app/runtimeDatas.dart';
 import 'package:animestream/core/database/tmdb/tmdb.dart';
 import 'package:animestream/core/database/tmdb/tmdbTypes.dart';
 import 'package:animestream/core/media/mediaStreamResolver.dart';
+import 'package:animestream/ui/models/playerControllers/betterPlayer.dart';
+import 'package:animestream/ui/models/playerControllers/fvp.dart';
+import 'package:animestream/ui/models/providers/playerDataProvider.dart';
+import 'package:animestream/ui/models/providers/playerProvider.dart';
 import 'package:animestream/ui/models/snackBar.dart';
+import 'package:animestream/ui/pages/watch.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MediaInfo extends StatefulWidget {
@@ -50,7 +59,7 @@ class _MediaInfoState extends State<MediaInfo> {
     }
   }
 
-  void _openStream(String title, String url) async {
+  void _openWebStream(String url) async {
     try {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
@@ -59,15 +68,114 @@ class _MediaInfoState extends State<MediaInfo> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      floatingSnackBar("Could not open stream: $e");
+      floatingSnackBar("Could not open web player: $e");
     }
   }
 
-  void _showServerSheet({int season = 1, int episode = 1}) {
+  void _playInNativePlayer({
+    required List<MediaStreamSource> sources,
+    required int initialIndex,
+    required String title,
+    required int episodeIndex,
+    required List<EpisodeDetails> epLinks,
+  }) {
+    try {
+      final videoStreams = MediaStreamResolver.convertToVideoStreams(sources);
+      final controller = Platform.isAndroid ? BetterPlayerWrapper() : FvpWrapper();
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MultiProvider(
+            providers: [
+              ChangeNotifierProvider(
+                create: (context) => PlayerDataProvider(
+                  initialStreams: videoStreams,
+                  initialStream: videoStreams[initialIndex],
+                  epLinks: epLinks,
+                  showTitle: title,
+                  coverImageUrl: widget.item.posterUrl.isNotEmpty ? widget.item.posterUrl : widget.item.backdropUrl,
+                  showId: widget.item.id,
+                  selectedSource: 'tmdb_media',
+                  startIndex: episodeIndex,
+                  altDatabases: [],
+                  lastWatchDuration: null,
+                ),
+              ),
+              ChangeNotifierProvider(
+                create: (context) => PlayerProvider(controller, true),
+              ),
+            ],
+            child: Watch(
+              controller: controller,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      floatingSnackBar("Error launching native player: $e");
+    }
+  }
+
+  void _startDownload({
+    required String streamUrl,
+    required String fileName,
+    Map<String, String>? headers,
+  }) async {
+    try {
+      await DownloadManager().addDownloadTask(
+        streamUrl,
+        fileName,
+        customHeaders: headers ?? const {},
+      );
+      floatingSnackBar("Queued download: $fileName");
+    } catch (e) {
+      floatingSnackBar("Download error: $e");
+    }
+  }
+
+  List<EpisodeDetails> _generateEpisodeDetailsList(int season) {
+    if (widget.item.isMovie) {
+      return [
+        EpisodeDetails(
+          episodeLink: widget.item.id.toString(),
+          episodeNumber: 1,
+          episodeTitle: widget.item.title,
+          thumbnail: widget.item.backdropUrl.isNotEmpty ? widget.item.backdropUrl : widget.item.posterUrl,
+          description: widget.item.overview,
+        )
+      ];
+    }
+
+    if (_episodes.isNotEmpty) {
+      return _episodes
+          .map((ep) => EpisodeDetails(
+                episodeLink: "${widget.item.id}+${ep.seasonNumber}+${ep.episodeNumber}",
+                episodeNumber: ep.episodeNumber,
+                episodeTitle: ep.name,
+                thumbnail: ep.stillUrl,
+                description: ep.overview,
+              ))
+          .toList();
+    }
+
+    return [
+      EpisodeDetails(
+        episodeLink: "${widget.item.id}+$season+1",
+        episodeNumber: 1,
+        episodeTitle: "Episode 1",
+      )
+    ];
+  }
+
+  void _showServerSheet({int season = 1, int episode = 1, bool isDownload = false}) {
     final isMovie = widget.item.isMovie;
-    final streams = isMovie
+    final sources = isMovie
         ? MediaStreamResolver.getMovieStreams(widget.item.id)
         : MediaStreamResolver.getTVStreams(widget.item.id, season, episode);
+
+    final epTitle = isMovie ? widget.item.title : "${widget.item.title} S${season.toString().padLeft(2, '0')}E${episode.toString().padLeft(2, '0')}";
+    final epLinks = _generateEpisodeDetailsList(season);
+    final epIdx = (episode - 1).clamp(0, epLinks.length - 1);
 
     showModalBottomSheet(
       context: context,
@@ -79,47 +187,124 @@ class _MediaInfoState extends State<MediaInfo> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isMovie ? "Select Movie Server" : "Select S$season E$episode Server",
-                      style: TextStyle(
-                        color: appTheme.textMainColor,
-                        fontFamily: "NotoSans",
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isDownload
+                            ? "Download: $epTitle"
+                            : (isMovie ? "Watch: ${widget.item.title}" : "Play: $epTitle"),
+                        style: TextStyle(
+                          color: appTheme.textMainColor,
+                          fontFamily: "NotoSans",
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54),
+                        onPressed: () => Navigator.pop(context),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (!isDownload) ...[
+                    // Primary Native Player Option
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: appTheme.accentColor.withValues(alpha: 0.15),
+                        border: Border.all(color: appTheme.accentColor.withValues(alpha: 0.4)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: appTheme.accentColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.play_arrow, color: appTheme.onAccent, size: 20),
+                        ),
+                        title: Text(
+                          "Play in Native ExoPlayer",
+                          style: TextStyle(
+                            color: appTheme.textMainColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          "Custom gestures, subtitles, and Android TV controls",
+                          style: TextStyle(color: appTheme.textSubColor, fontSize: 11),
+                        ),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: appTheme.accentColor),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _playInNativePlayer(
+                            sources: sources,
+                            initialIndex: 0,
+                            title: epTitle,
+                            episodeIndex: epIdx,
+                            epLinks: epLinks,
+                          );
+                        },
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white54),
-                      onPressed: () => Navigator.pop(context),
-                    )
+                    const Divider(color: Colors.white12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        "Streaming Servers & Mirrors:",
+                        style: TextStyle(color: appTheme.textSubColor, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                ...streams.map((s) => ListTile(
-                      leading: Icon(Icons.play_circle_fill, color: appTheme.accentColor),
+
+                  ...sources.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final s = entry.value;
+                    return ListTile(
+                      leading: Icon(
+                        isDownload ? Icons.download_for_offline : Icons.cast_connected,
+                        color: appTheme.accentColor,
+                      ),
                       title: Text(
                         s.serverName,
-                        style: TextStyle(color: appTheme.textMainColor, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: appTheme.textMainColor, fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                       subtitle: Text(
-                        "High Definition HLS Stream",
-                        style: TextStyle(color: appTheme.textSubColor, fontSize: 12),
+                        isDownload ? "Queue for offline playback" : "In-App Clean Player Mirror",
+                        style: TextStyle(color: appTheme.textSubColor, fontSize: 11),
                       ),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 14, color: appTheme.textSubColor),
+                      trailing: Icon(
+                        isDownload ? Icons.download_rounded : Icons.open_in_new,
+                        size: 16,
+                        color: appTheme.textSubColor,
+                      ),
                       onTap: () {
                         Navigator.pop(context);
-                        _openStream(widget.item.title, s.streamUrl);
+                        if (isDownload) {
+                          _startDownload(
+                            streamUrl: s.streamUrl,
+                            fileName: epTitle,
+                            headers: s.headers,
+                          );
+                        } else {
+                          _openWebStream(s.embedUrl);
+                        }
                       },
-                    )),
-                const SizedBox(height: 12),
-              ],
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           ),
         );
@@ -260,7 +445,7 @@ class _MediaInfoState extends State<MediaInfo> {
                                   "Watch Movie",
                                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
-                                onPressed: () => _showServerSheet(),
+                                onPressed: () => _showServerSheet(isDownload: false),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -273,7 +458,7 @@ class _MediaInfoState extends State<MediaInfo> {
                               ),
                               icon: const Icon(Icons.download_rounded),
                               label: const Text("Download"),
-                              onPressed: () => _showServerSheet(),
+                              onPressed: () => _showServerSheet(isDownload: true),
                             ),
                           ],
                         ),
@@ -398,16 +583,31 @@ class _MediaInfoState extends State<MediaInfo> {
                                         style: TextStyle(color: appTheme.textSubColor, fontSize: 11),
                                       )
                                     : null,
-                                trailing: IconButton(
-                                  icon: Icon(Icons.play_circle_outline, color: appTheme.accentColor),
-                                  onPressed: () => _showServerSheet(
-                                    season: ep.seasonNumber,
-                                    episode: ep.episodeNumber,
-                                  ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(Icons.download_rounded, color: appTheme.textSubColor, size: 20),
+                                      onPressed: () => _showServerSheet(
+                                        season: ep.seasonNumber,
+                                        episode: ep.episodeNumber,
+                                        isDownload: true,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(Icons.play_circle_fill, color: appTheme.accentColor, size: 24),
+                                      onPressed: () => _showServerSheet(
+                                        season: ep.seasonNumber,
+                                        episode: ep.episodeNumber,
+                                        isDownload: false,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 onTap: () => _showServerSheet(
                                   season: ep.seasonNumber,
                                   episode: ep.episodeNumber,
+                                  isDownload: false,
                                 ),
                               );
                             },

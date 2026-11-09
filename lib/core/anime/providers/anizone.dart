@@ -128,8 +128,8 @@ class AniZone extends AnimeProvider {
 
   @override
   Future<void> getDownloadSources(String episodeUrl, Function(List<VideoStream> p1, bool p2) update,
-      {bool dub = false, String? metadata}) {
-    throw UnimplementedError();
+      {bool dub = false, String? metadata}) async {
+    return getStreams(episodeUrl, update, dub: dub, metadata: metadata);
   }
 
   @override
