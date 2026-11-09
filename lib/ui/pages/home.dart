@@ -19,6 +19,9 @@ import 'package:animestream/ui/pages/settingPages/common.dart';
 import 'package:animestream/ui/pages/settingPages/stats.dart';
 import 'package:animestream/ui/pages/settings.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:animestream/core/database/tmdb/tmdb.dart';
+import 'package:animestream/core/database/tmdb/tmdbTypes.dart';
+import 'package:animestream/ui/models/widgets/cards/mediaCard.dart';
 import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
@@ -42,6 +45,33 @@ class _HomeState extends State<Home> {
   final PageController _heroPageController = PageController();
   int _heroCurrentPage = 0;
   Timer? _heroTimer;
+
+  int _selectedCategory = 0; // 0: All Anime, 1: Movies, 2: TV Series
+  List<TMDBItem> _trendingMovies = [];
+  List<TMDBItem> _popularMovies = [];
+  List<TMDBItem> _trendingTV = [];
+  List<TMDBItem> _popularTV = [];
+  bool _loadingMedia = false;
+
+  void _loadMediaData() async {
+    if (_trendingMovies.isNotEmpty && _trendingTV.isNotEmpty) return;
+    if (mounted) setState(() => _loadingMedia = true);
+    final results = await Future.wait([
+      TMDBService.getTrendingMovies(),
+      TMDBService.getPopularMovies(),
+      TMDBService.getTrendingTV(),
+      TMDBService.getPopularTV(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _trendingMovies = results[0];
+        _popularMovies = results[1];
+        _trendingTV = results[2];
+        _popularTV = results[3];
+        _loadingMedia = false;
+      });
+    }
+  }
 
   void _onProviderUpdate() {
     if (mounted) setState(() {});
@@ -74,6 +104,7 @@ class _HomeState extends State<Home> {
       });
     }
     _startHeroTimer();
+    _loadMediaData();
   }
 
   @override
@@ -160,6 +191,32 @@ class _HomeState extends State<Home> {
                       // Crunchyroll-style Top Hero Spotlight
                       _heroSpotlight(),
 
+                      // Category Filter Tabs (Anime, Movies, TV Series)
+                      _categoryFilterBar(),
+
+                      if (_selectedCategory == 1) ...[
+                        if (_loadingMedia)
+                          Padding(
+                            padding: const EdgeInsets.all(40.0),
+                            child: Center(child: CircularProgressIndicator(color: appTheme.accentColor)),
+                          )
+                        else ...[
+                          _mediaSection("Trending Movies", _trendingMovies),
+                          divider(),
+                          _mediaSection("Popular Blockbusters", _popularMovies),
+                        ],
+                      ] else if (_selectedCategory == 2) ...[
+                        if (_loadingMedia)
+                          Padding(
+                            padding: const EdgeInsets.all(40.0),
+                            child: Center(child: CircularProgressIndicator(color: appTheme.accentColor)),
+                          )
+                        else ...[
+                          _mediaSection("Trending TV Series", _trendingTV),
+                          divider(),
+                          _mediaSection("Popular Shows", _popularTV),
+                        ],
+                      ] else ...[
                       // Logged-in user stats bar
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 400),
@@ -218,6 +275,7 @@ class _HomeState extends State<Home> {
                         divider(),
                         _titleAndList("From Your Planned", widget.mainNavProvider.plannedList),
                       ],
+                      ], // End of Anime category else block
                       footSpace(),
                     ],
                   ),
@@ -232,6 +290,94 @@ class _HomeState extends State<Home> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _categoryFilterBar() {
+    final categories = ["All Anime", "Movies", "TV Series"];
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final isSelected = _selectedCategory == index;
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedCategory = index);
+              if (index > 0 && (_trendingMovies.isEmpty || _trendingTV.isEmpty)) {
+                _loadMediaData();
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? appTheme.accentColor : Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? appTheme.accentColor : Colors.white.withValues(alpha: 0.12),
+                  width: 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: appTheme.accentColor.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  categories[index],
+                  style: TextStyle(
+                    color: isSelected ? appTheme.onAccent : appTheme.textMainColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontFamily: "NotoSans",
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _mediaSection(String title, List<TMDBItem> list) {
+    if (list.isEmpty) return const SizedBox();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: appTheme.textMainColor,
+              fontFamily: "NotoSans",
+            ),
+          ),
+        ),
+        SizedBox(
+          height: Platform.isWindows || Platform.isLinux ? 280 : 230,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: list.length,
+            itemBuilder: (context, index) {
+              return MediaCard(item: list[index]);
+            },
+          ),
+        ),
+      ],
     );
   }
 

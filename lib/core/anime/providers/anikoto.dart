@@ -363,6 +363,6 @@ class Anikoto implements AnimeProvider {
   @override
   Future<void> getDownloadSources(String episodeUrl, Function(List<VideoStream>, bool) update,
       {bool dub = false, String? metadata}) async {
-    throw UnimplementedError();
+    return getStreams(episodeUrl, update, dub: dub, metadata: metadata);
   }
 }

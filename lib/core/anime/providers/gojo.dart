@@ -163,7 +163,6 @@ class Gojo extends AnimeProvider {
   Future<void> getDownloadSources(
       String episodeUrl, Function(List<VideoStream> p1, bool p2) update,
       {bool dub = false, String? metadata}) {
-    // download the stream
-    throw UnimplementedError();
+    return getStreams(episodeUrl, update, dub: dub, metadata: metadata);
   }
 }

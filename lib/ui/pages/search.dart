@@ -10,6 +10,9 @@ import 'package:animestream/ui/models/widgets/cards.dart';
 import 'package:animestream/ui/models/widgets/cards/animeCardExtended.dart';
 import 'package:animestream/ui/models/widgets/header.dart';
 import 'package:animestream/ui/pages/settingPages/common.dart';
+import 'package:animestream/core/database/tmdb/tmdb.dart';
+import 'package:animestream/core/database/tmdb/tmdbTypes.dart';
+import 'package:animestream/ui/models/widgets/cards/mediaCard.dart';
 import 'package:flutter/material.dart';
 
 class Search extends StatefulWidget {
@@ -30,6 +33,34 @@ class _SearchState extends State<Search> {
   Timer? debounce;
 
   final db = DatabaseHandler();
+
+  int searchMode = 0; // 0: Anime, 1: Movies & Series
+  List<TMDBItem> tmdbResults = [];
+
+  Future searchTMDB(String query) async {
+    tmdbResults = [];
+    if (query.trim().isEmpty) {
+      if (mounted) setState(() => _searching = false);
+      return;
+    }
+    final items = await TMDBService.searchMulti(query);
+    if (mounted) {
+      setState(() {
+        tmdbResults = items;
+        _searching = false;
+      });
+    }
+  }
+
+  void _triggerSearch(String val) async {
+    if (val.trim().length <= 1) return;
+    setState(() => _searching = true);
+    if (searchMode == 1) {
+      await searchTMDB(val);
+    } else {
+      await addCards(val);
+    }
+  }
 
   Future addCards(String query) async {
     results = []; //for cleaning the UI
@@ -118,10 +149,53 @@ class _SearchState extends State<Search> {
     );
   }
 
+  Widget _modeButton(int mode, String label) {
+    final isSel = searchMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() => searchMode = mode);
+        if (textEditingController.text.trim().length > 1) {
+          _triggerSearch(textEditingController.text);
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSel ? appTheme.accentColor : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSel ? appTheme.accentColor : Colors.white.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSel ? appTheme.onAccent : appTheme.textMainColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            fontFamily: "NotoSans",
+          ),
+        ),
+      ),
+    );
+  }
+
   Container _searchOptions() {
     return Container(
-      padding: EdgeInsets.only(top: 10),
-      child: Row(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _modeButton(0, "Anime"),
+              const SizedBox(width: 8),
+              _modeButton(1, "Movies & Series"),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
         children: [
           Checkbox(
             value: exactMatch,
@@ -160,10 +234,50 @@ class _SearchState extends State<Search> {
           ),
         ],
       ),
+      ],
+      ),
     );
   }
 
   Container _searchResults() {
+    if (searchMode == 1) {
+      if (tmdbResults.isEmpty) {
+        if (textEditingController.text.length > 2) {
+          return Center(
+            child: Text(
+              "No movies or TV shows found",
+              style: TextStyle(color: appTheme.textSubColor, fontFamily: "NotoSans"),
+            ),
+          );
+        }
+        return Container();
+      }
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              GridView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 180,
+                  mainAxisExtent: Platform.isAndroid ? 230 : 270,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 15,
+                ),
+                itemCount: tmdbResults.length,
+                itemBuilder: (context, index) {
+                  return MediaCard(item: tmdbResults[index]);
+                },
+              ),
+              footSpace(),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
       padding: EdgeInsets.only(left: 15, right: 15),
       child: SingleChildScrollView(
@@ -233,7 +347,7 @@ class _SearchState extends State<Search> {
           setState(() {
             _searching = true;
           });
-          await addCards(val);
+          _triggerSearch(val);
         });
       },
       onSubmitted: (val) async {
@@ -244,7 +358,7 @@ class _SearchState extends State<Search> {
         setState(() {
           _searching = true;
         });
-        await addCards(val);
+        _triggerSearch(val);
       },
       autocorrect: false,
       cursorColor: appTheme.accentColor,
